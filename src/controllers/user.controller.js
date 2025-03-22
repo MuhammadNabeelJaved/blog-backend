@@ -26,7 +26,7 @@ const genrateAccessAndRefreshToken = async (userId) => {
         return { accessToken, refreshToken }
 
     } catch (error) {
-
+        throw new ApiError(500, "Something went wrong while generating tokens");
     }
 }
 
@@ -137,15 +137,21 @@ const getProfile = asyncHandler(async (req, res) => {
     const user = findUser.toObject();
     delete user.password;
 
-
-
     return res
         .status(200)
         .json(new ApiResponse(200, "User profile fetched successfully.", user));
-
 })
 
+// Add a new function to get current user info
+const getCurrentUser = asyncHandler(async (req, res) => {
+    // req.user is set by the authorizeUser middleware
+    const user = req.user.toObject();
+    delete user.password;
 
+    return res
+        .status(200)
+        .json(new ApiResponse(200, "User fetched successfully.", user));
+})
 
 const logoutUser = asyncHandler(async (req, res) => {
     await User.findByIdAndUpdate(req.user._id,
@@ -168,48 +174,58 @@ const logoutUser = asyncHandler(async (req, res) => {
         .clearCookie("refreshToken", "", options)
         .clearCookie("accessToken", "", options)
         .json(new ApiResponse(200, "User logged out successfully."));
-
 })
 
+const refreshAccessToken = asyncHandler(async (req, res) => {
+    try {
+        // Fixed: Get refresh token from body
+        const incomingRefreshToken = req.body.refreshToken ||
+            req.cookies?.refreshToken ||  // Try from cookies
+            req.headers["x-refresh-token"]; // Try from custom header
 
-const refreshToken = asyncHandler(async (req, res) => {
-    const { refreshToken } = req.cookies?.accessToken || req.headers.authorization?.split(" ")[1]
 
-    if (!refreshToken) {
-        throw new ApiError(401, "Please login to access this route");
+        if (!incomingRefreshToken) {
+            throw new ApiError(401, "Refresh token not found");
+        }
+
+        const decoded = jwt.verify(incomingRefreshToken, process.env.JWT_REFRESH_SECRET);
+
+        if (!decoded) {
+            throw new ApiError(401, "Invalid refresh token");
+        }
+
+        const user = await User.findById(decoded?._id);
+
+        if (!user) {
+            throw new ApiError(404, "User not found");
+        }
+
+        if (user.refreshToken !== incomingRefreshToken) {
+            throw new ApiError(401, "Refresh token is expired or used");
+        }
+
+        const { accessToken, refreshToken: newRefreshToken } = await genrateAccessAndRefreshToken(user._id)
+
+        const options = {
+            httpOnly: true,
+            secure: true,
+        }
+
+        return res
+            .status(200)
+            .cookie("refreshToken", newRefreshToken, options)
+            .cookie("accessToken", accessToken, options)
+            .json(new ApiResponse(200, "Token refreshed successfully.", { accessToken, refreshToken: newRefreshToken }));
+    } catch (error) {
+        throw new ApiError(401, error.message || "Invalid refresh token");
     }
-
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-
-    if (!decoded) {
-        throw new ApiError(401, "Invalid token");
-    }
-
-    const user = await User.findById(decoded?._id);
-
-    if (!user) {
-        throw new ApiError(404, "User not found");
-    }
-
-    if (user.refreshToken !== refreshToken) {
-        throw new ApiError(401, "Invalid token");
-    }
-
-    const { accessToken, newRefreshToken } = await genrateAccessAndRefreshToken(user._id)
-
-    const options = {
-        httpOnly: true,
-        secure: true,
-    }
-
-    return res
-        .status(200)
-        .cookie("refreshToken", newRefreshToken, options)
-        .cookie("accessToken", accessToken, options)
-        .json(new ApiResponse(200, "Token refreshed successfully."));
-
 })
 
-
-
-export { registerUser, loginUser, logoutUser, refreshToken, getProfile }
+export {
+    registerUser,
+    loginUser,
+    logoutUser,
+    refreshAccessToken,
+    getProfile,
+    getCurrentUser
+}

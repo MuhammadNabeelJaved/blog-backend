@@ -3,6 +3,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/apiErrors.js";
 import ApiResponse from "../utils/apiResponse.js";
 import uploadOnCloudinary from "../services/Cloudinary.js";
+import User from "../models/user.model.js";
 
 
 
@@ -54,9 +55,35 @@ const getAllBlogs = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, "All blogs", blogs));
 });
 
+const currentUserBlogs = asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user?._id)
+
+    if (!user) {
+        throw new ApiError(404, "User not found")
+    }
+
+    const userBlogs = await Blog.find({ user: user?._id })
+
+    if (!userBlogs) {
+        throw new ApiError(404, "No blogs found for this user")
+    }
+
+    const totalBlogsComments = userBlogs.reduce((acc, blog) => {
+        return acc + blog.comments.length
+    }, 0)
+
+    if (!totalBlogsComments) {
+        throw new ApiError(404, "No comments found for this user")
+    }
+
+
+    return res.status(200).json(new ApiResponse(200, "User blogs", { userBlogs, totalBlogsComments }));
+})
+
 
 
 export {
     createBlog,
     getAllBlogs,
+    currentUserBlogs,
 }
