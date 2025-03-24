@@ -8,8 +8,6 @@ import asyncHandler from "../utils/asyncHandler.js";
 const createComment = asyncHandler(async (req, res, next) => {
     const { comment, blogId } = req.body;
 
-    console.log("comment", comment);
-
     if (!comment) {
         return next(new ApiError(400, "Comment is required"));
     }

@@ -35,8 +35,6 @@ const registerUser = asyncHandler(async (req, res) => {
 
     const avatar = req?.file?.path
 
-    console.log(fullName, email, password, avatar)
-
     if (!fullName || !email || !password || !avatar) {
         throw new ApiError(400, "Please provide full name, email, avatar and password fields");
     }
@@ -80,8 +78,6 @@ const registerUser = asyncHandler(async (req, res) => {
 
 const loginUser = asyncHandler(async (req, res) => {
     const { fullName, email, password } = req.body
-
-    console.log(fullName, email, password)
 
     if (!email || !password) {
         throw new ApiError(400, "Please provide email and password fields");
