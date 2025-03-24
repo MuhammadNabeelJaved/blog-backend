@@ -31,7 +31,6 @@ async function uploadOnCloudinary(file) {
 
                 // Remove the file
                 fs.unlinkSync(filePath);
-                console.log(`File ${fileName} removed from temp folder`);
             } catch (removeError) {
                 console.error('Error removing file from temp folder:', removeError);
             }
